@@ -1,7 +1,6 @@
 defmodule DreamController do
   use Plug.Router
 
-  plug :match
   plug :dispatch
 
   get "/dreams/:id" do
