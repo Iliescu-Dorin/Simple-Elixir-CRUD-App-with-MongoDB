@@ -15,6 +15,14 @@ defmodule BackendStuffApi.Router do
 
   get("/", do: send_resp(conn, 200, "OK"))
 
+
+  plug DreamController
+  get "/dreams/:id", do: DreamController.get
+  put "/dreams/:id", do: DreamController.put
+  post "/dreams", do: DreamController.post
+  delete "/dreams/:id", do: DreamController.delete
+
+
   get("/aliens_name", do: send_resp(conn, 200, "Blork Erlang"))
 
   get "/knockknock" do
