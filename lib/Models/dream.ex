@@ -8,7 +8,7 @@ defmodule Dream do
   end
 
   def update(dream = %__MODULE__{}, attrs) do
-    %__MODULE__{ dream | attrs }
+    Map.merge(dream, attrs)
   end
 
   def add_event(dream, event) do
