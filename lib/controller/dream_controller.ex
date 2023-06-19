@@ -1,8 +1,6 @@
 defmodule DreamController do
   use Plug.Router
 
-  import Jason
-
   plug :match
   plug :dispatch
 
