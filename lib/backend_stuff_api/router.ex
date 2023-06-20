@@ -167,6 +167,105 @@ defmodule BackendStuffApi.Router do
     |> send_resp(200, Jason.encode!(%{id: id}))
   end
 
+
+  post "/comments" do
+    case conn.body_params do
+      %{"title" => title, "body" => body, "user_id" => user_id, "dream_id" => dream_id} ->
+        case Mongo.insert_one(:mongo, "comments", %{"title" => title, "body" => body, "user_id" => user_id, "dream_id" => dream_id}) do
+          {:ok, user} ->
+            doc = Mongo.find_one(:mongo, "comments", %{_id: user.inserted_id})
+
+            comment =
+              BackendStuffApi.JSONUtils.normaliseMongoId(doc)
+              |> Jason.encode!()
+
+            conn
+            |> put_resp_content_type("application/json")
+            |> send_resp(200, comment)
+
+          {:error, _} ->
+            send_resp(conn, 500, "Something went wrong")
+        end
+
+      _ ->
+        send_resp(conn, 400, '')
+    end
+  end
+
+  get "/comments" do
+    comments =
+      Mongo.find(:mongo, "comments", %{})
+      |> Enum.map(&BackendStuffApi.JSONUtils.normaliseMongoId/1)
+      |> Enum.to_list()
+      |> Jason.encode!()
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, comments)
+  end
+
+  get "/comments/:id" do
+    doc = Mongo.find_one(:mongo, "comments", %{_id: BSON.ObjectId.decode!(id)})
+
+    case doc do
+      nil ->
+        send_resp(conn, 404, "Not Found")
+
+      %{} ->
+        comment =
+          BackendStuffApi.JSONUtils.normaliseMongoId(doc)
+          |> Jason.encode!()
+
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(200, comment)
+
+      {:error, _} ->
+        send_resp(conn, 500, "Something went wrong")
+    end
+  end
+
+  put "comments/:id" do
+    case Mongo.find_one_and_update(
+           :mongo,
+           "comments",
+           %{_id: BSON.ObjectId.decode!(id)},
+           %{
+             "$set":
+               conn.body_params
+               |> Map.take(["name", "content"])
+               |> Enum.into(%{}, fn {key, value} -> {"#{key}", value} end)
+           },
+           return_document: :after
+         ) do
+      {:ok, doc} ->
+        case doc do
+          nil ->
+            send_resp(conn, 404, "Not Found")
+
+          _ ->
+            comment =
+              BackendStuffApi.JSONUtils.normaliseMongoId(doc)
+              |> Jason.encode!()
+
+            conn
+            |> put_resp_content_type("application/json")
+            |> send_resp(200, comment)
+        end
+
+      {:error, _} ->
+        send_resp(conn, 500, "Something went wrong")
+    end
+  end
+
+  delete "comments/:id" do
+    Mongo.delete_one!(:mongo, "comments", %{_id: BSON.ObjectId.decode!(id)})
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(%{id: id}))
+  end
+
   match(_, do: send_resp(conn, 404, "Not Found"))
 
 end
