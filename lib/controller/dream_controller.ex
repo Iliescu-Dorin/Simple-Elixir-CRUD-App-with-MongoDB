@@ -1,96 +1,70 @@
-defmodule DreamController do
+defmodule BackendStuffApi.DreamController do
   use Plug.Router
 
+  plug :match
   plug :dispatch
-
-  get "/dreams/:id" do
-    id = conn.params["id"]
-
-    # Get from database
-    case MongoDB.find_one("dreams", %{"id" => id}) do
-      {:ok, dream} ->
-        # Create the dream retrival event.
-        event = %DreamEvent{ dream_id: id, event_type: "retrival", timestamp: DateTime.utc_now() }
-        dream_event = Dream.add_event(dream, event)
-
-        conn
-        |> put_status(:ok)
-        |> put_resp_content_type("application/json")
-        |> send_resp(:ok, Jason.encode!(dream_event))
-
-      {:error, _} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> send_resp(:internal_server_error, "Error retrieving dream!")
-    end
-  end
+  plug DreamApp.AuthPlug
 
   put "/dreams/:id" do
-    id = conn.params["id"]
-    body = Plug.Conn.read_body(conn)
-    params = Jason.decode!(body)
+    { :ok, %{ "title" => title, "category" => category, "body" => body } } = Plug.Conn.read_body(conn)
 
-    # Get from database.
-    case MongoDB.find_one("dreams", %{"id" => id}) do
-      {:ok, dream} ->
-        updated_dream = Map.merge(dream, params)
+    user_id = DreamApp.Auth.decode_token(conn.private[:token])["sub"]
+    dream_id = conn.params["id"]
 
-        # Create the dream update event.
-        event = %DreamEvent{ dream_id: updated_dream.id, event_type: "update", timestamp: DateTime.utc_now() }
-        updated_dream_event = Dream.add_event(updated_dream, event)
+    case DreamApp.DreamRepository.get_dream_by_id(dream_id) do
+      nil ->
+        send_resp(conn, 404, "Dream not found!")
 
-        # Update the dream in the database.
-        MongoDB.update_one("dreams", %{"id" => id}, %{"$set" => updated_dream_event})
+      %DreamApp.Dream{ user_id: user_id } = dream ->
+        dream_params = %{ title: title, category: category, body: body }
 
-        conn
-        |> put_status(:ok)
-        |> put_resp_content_type("application/json")
-        |> send_resp(:ok, Jason.encode!(updated_dream_event))
+        case DreamApp.DreamRepository.update_dream(dream, dream_params) do
+          { :ok, dream } ->
+            send_resp(conn, 200, %{ message: "Dream updated", dream: dream })
 
-      {:error, _} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> send_resp(:internal_server_error, "Error updating dream!")
+          { :error, changeset } ->
+            send_resp(conn, 400, %{ errors: changeset.errors })
+        end
+
+      _ ->
+        send_resp(conn, 401, "Unauthorized action!")
     end
   end
 
   post "/dreams" do
-    dream_params = Jason.decode!(conn.body_params, keys: ~w(user_id category title body)a)
-    dream = Dream.create(dream_params)
+    { :ok, %{ "title" => title, "category" => category, "body" => body } } = Plug.Conn.read_body(conn)
 
-    # Create the dream creation event.
-    event = %DreamEvent{ dream_id: dream.id, event_type: "creation", timestamp: DateTime.utc_now() }
-    dream_event = Dream.add_event(dream, event)
+    user_id = DreamApp.Auth.decode_token(conn.private[:token])["sub"]
+    user = DreamApp.UserRepository.get_user_by_id(user_id)
 
-    # Insert into database.
-    case MongoDB.insert_one("dreams", dream_event) do
-      {:ok, _} ->
-        conn
-        |> put_status(:ok)
-        |> put_resp_content_type("application/json")
-        |> send_resp(:ok, Jason.encode!(dream_event))
+    dream_params = %{ title: title, category: category, body: body, user: user }
+    case DreamApp.DreamRepository.create_dream(dream_params) do
+      { :ok, dream } ->
+        send_resp(conn, 201, %{ message: "Dream created", dream: dream })
 
-      {:error, _} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> send_resp(:internal_server_error, "Error creating dream!")
+      { :error, changeset } ->
+        send_resp(conn, 400, %{ errors: changeset.errors })
     end
   end
 
   delete "/dreams/:id" do
-    id = conn.params["id"]
+    user_id = DreamApp.Auth.decode_token(conn.private[:token])["sub"]
+    dream_id = conn.params["id"]
 
-    # Delete from database.
-    case MongoDB.delete_one("dreams", %{"id" => id}) do
-      {:ok, _} ->
-        conn
-        |> put_status(:ok)
-        |> send_resp(:ok, "Dream has been deleted successfully!")
+    case DreamApp.DreamRepository.get_dream_by_id(dream_id) do
+      nil ->
+        send_resp(conn, 404, "Dream not found!")
 
-      {:error, _} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> send_resp(:internal_server_error, "Error deleting dream!")
+      %DreamApp.Dream{ user_id: user_id } = dream ->
+        DreamApp.DreamRepository.delete_dream(dream)
+        send_resp(conn, 204, "Dream removed")
+
+      _ ->
+        send_resp(conn, 401, "Unauthorized action!")
     end
+  end
+
+  defp do_match(conn, _opts) do
+    send_resp(conn, 404, "DreamController -> endpoint, Not Found!")
   end
 end

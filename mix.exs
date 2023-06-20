@@ -14,6 +14,7 @@ defmodule BackendStuffApi.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
+      applications: [:plug_cowboy, :logger, :mongodb, :ecto],
       extra_applications: [:logger],
       mod: {BackendStuffApi.Application, []}
     ]
@@ -26,8 +27,12 @@ defmodule BackendStuffApi.MixProject do
       {:jason, "~> 1.4"},
       {:mongodb, "~> 1.0.0"},
       # {:mongodb_driver, "~> 1.0.0"},
-      {:amqp, "~> 3.3"},
-      {:uuid, "~> 1.1.8"}
+      # {:amqp, "~> 3.3"},
+      {:ecto, "~> 3.7"},
+      {:uuid, "~> 1.1.8"},
+      {:comeonin, "~> 5.2"},
+      {:guardian, "~> 2.0"},
+      {:mongodb_ecto, "~> 1.0.0"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

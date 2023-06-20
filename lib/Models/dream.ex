@@ -1,22 +1,12 @@
-defmodule Dream do
+defmodule DreamApp.Dream do
+  use Ecto.Schema
 
-  defstruct [:id, :user_id, :category, :title, :body, :events]
+  schema "dreams" do
+    field :title, :string
+    field :category, :string
+    field :body, :string
+    belongs_to :user, DreamApp.User
 
-
-  def create(attrs \\ %{}) do
-    %__MODULE__{ attrs | id: generate_id(), events: [] }
-  end
-
-  def update(dream = %__MODULE__{}, attrs) do
-    Map.merge(dream, attrs)
-  end
-
-  def add_event(dream, event) do
-    %__MODULE__{ dream | events: [event | dream.events] }
-  end
-
-
-  defp generate_id() do
-    UUID.uuid4()
+    timestamps()
   end
 end
