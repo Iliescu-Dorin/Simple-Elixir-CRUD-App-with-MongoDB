@@ -1,5 +1,4 @@
 defmodule DreamApp.UserRepository do
-
   def create_user(attrs \\ %{}) do
     %DreamApp.User{}
     |> DreamApp.User.changeset(Map.put(attrs, :email, attrs.email), [:email, :password])
@@ -20,13 +19,15 @@ defmodule DreamApp.UserRepository do
     #   |> Mongo.db("backend_stuff_api_db")
     #   |> Mongo.Db.collection("users")
 
-    query = %{email: email}
+    # query = %{email: email}
 
-    case Mongo.find_one(:mongo, "users", query) do
-      {:ok, result} -> result
-      {:error, _reason} -> nil
+    case Mongo.find_one(:mongo, "users", %{email: email}) do
+      # {:ok, result} -> result
+      # {:error, _reason} -> nil
+      nil ->
+        nil
+      doc ->
+        doc
     end
   end
-
-
 end

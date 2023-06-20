@@ -31,7 +31,7 @@ defmodule DreamApp.AuthController do
         email = conn.params["email"]
         password = conn.params["password"]
 
-        case DreamApp.UserRepository.get_user_by_email(email) do
+        case Mongo.find_one(:mongo, "users", %{"email" => email}) do
           nil ->
             case DreamApp.UserRepository.create_user(%{email: email, password: password}) do
               {:ok, user} ->
