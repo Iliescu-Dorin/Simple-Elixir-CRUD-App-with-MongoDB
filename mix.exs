@@ -5,7 +5,7 @@ defmodule BackendStuffApi.MixProject do
     [
       app: :backend_stuff_api,
       version: "0.1.0",
-      elixir: "~> 1.14",
+      elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -30,7 +30,7 @@ defmodule BackendStuffApi.MixProject do
       # {:amqp, "~> 3.3"},
       {:ecto, "~> 3.7"},
       {:uuid, "~> 1.1.8"},
-      {:comeonin, "~> 5.2"},
+      {:comeonin, "~> 2.6"},
       {:guardian, "~> 2.0"},
       {:mongodb_ecto, "~> 1.0.0"}
       # {:dep_from_hexpm, "~> 0.3.0"},

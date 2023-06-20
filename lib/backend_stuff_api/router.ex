@@ -3,7 +3,7 @@ defmodule BackendStuffApi.Router do
   use Plug.Router
   plug(Plug.Logger)
 
-  plug(:match)
+  plug :match
 
   plug(Plug.Parsers,
     parsers: [:json, :urlencoded, :multipart],
@@ -11,7 +11,7 @@ defmodule BackendStuffApi.Router do
     json_decoder: Jason
   )
 
-  plug(:dispatch)
+  plug :dispatch
 
   get("/", do: send_resp(conn, 200, "OK"))
 
@@ -25,66 +25,147 @@ defmodule BackendStuffApi.Router do
     end
   end
 
-  # post "/comments", Controller.CommentController, :create_comment
+  post "/register" do
+    case conn.body_params do
+      %{"email" => email, "password" => password} ->
+        case Mongo.insert_one(:mongo, "users", %{"email" => email, "password" => password}) do
+          {:ok, user} ->
+            doc = Mongo.find_one(:mongo, "users", %{_id: user.inserted_id})
 
-  # get "/insert" do
-  #       Mongo.insert_one(nil, "users", %{first_name: "John", last_name: "Smith"})
-  # end
-  # get "/dreams/:id", private: @skip_token_verification do
-  #   id = conn.params["id"]
+            user =
+              BackendStuffApi.JSONUtils.normaliseMongoId(doc)
+              |> Jason.encode!()
 
-  #   # Get from database
-  #   case Mongo.find_one(:mongo,"dreams", %{"user_id": "1"}) do
-  #     nil ->
-  #       :error
-  #     doc ->
-  #       {:ok, doc |> MapHelper.string_keys_to_atoms |> merge_to_struct}
-  #     {:ok, dream} ->
-  #       # Create the dream retrival event.
-  #       event = %DreamEvent{dream_id: id, event_type: "retrival", timestamp: DateTime.utc_now()}
-  #       dream_event = Dream.add_event(dream, event)
+            conn
+            |> put_resp_content_type("application/json")
+            |> send_resp(200, user)
 
-  #       conn
-  #       |> put_status(:ok)
-  #       |> put_resp_content_type("application/json")
-  #       |> send_resp(:ok, Jason.encode!(dream_event))
+          {:error, _} ->
+            send_resp(conn, 500, "Something went wrong")
+        end
 
-  #     {:error, _} ->
-  #       conn
-  #       |> put_status(:internal_server_error)
-  #       |> send_resp(:internal_server_error, "Error retrieving dream!")
-  #   end
-  # end
+      _ ->
+        send_resp(conn, 400, '')
+    end
+  end
 
-  forward "/dreams", to: BackendStuffApi.DreamController
-  forward "/auth", to: DreamApp.AuthController
-  # forward "/comments", to: BackendStuffApi.CommentController
+  post "/login" do
+    case Plug.Conn.read_body(conn) do
+      {:ok, _body, conn} ->
+        email = conn.params["email"]
+        password = conn.params["password"]
+        case Mongo.find_one(:mongo, "users", %{email: email}) do
+          nil ->
+            send_resp(conn, 401, "Invalid email or password")
 
-  # get "/dreams/:id", private: @skip_token_verification do
-  #   case getById(String.to_integer(id)) do
-  #     {:ok, id} ->
-  #       IO.inspect(id)
+          user ->
+            if Comeonin.Bcrypt.checkpw(password, user["password"]) do
+              token = DreamApp.Auth.encode_token(user["_id"])
+              send_resp(conn, 200, %{token: token})
+            else
+              send_resp(conn, 401, "Invalid email or password!")
+            end
+        end
+    end
+  end
 
-  #       conn
-  #       |> put_status(200)
-  #       |> assign(:jsonapi, id)
+  post "/dreams" do
+    case conn.body_params do
+      %{"title" => title, "category" => category, "body" => body} ->
+        case Mongo.insert_one(:mongo, "dreams", %{"title" => title, "category" => category, "body" => body}) do
+          {:ok, user} ->
+            doc = Mongo.find_one(:mongo, "dreams", %{_id: user.inserted_id})
 
-  #     :error ->
-  #       conn
-  #       |> put_status(404)
-  #       |> assign(:jsonapi, %{"error" => "There was an error"})
-  #   end
-  # end
+            dream =
+              BackendStuffApi.JSONUtils.normaliseMongoId(doc)
+              |> Jason.encode!()
 
-  # def getById(id) do
-  #   case Mongo.find_one(:mongo, "dreams", %{user_id: "1"}) do
-  #     nil ->
-  #       :error
+            conn
+            |> put_resp_content_type("application/json")
+            |> send_resp(200, dream)
 
-  #     doc ->
-  #       {:ok, doc |> MapHelper.string_keys_to_atoms()}
-  #   end
-  # end
+          {:error, _} ->
+            send_resp(conn, 500, "Something went wrong")
+        end
+
+      _ ->
+        send_resp(conn, 400, '')
+    end
+  end
+
+  get "/dreams" do
+    dreams =
+      Mongo.find(:mongo, "dreams", %{})
+      |> Enum.map(&BackendStuffApi.JSONUtils.normaliseMongoId/1)
+      |> Enum.to_list()
+      |> Jason.encode!()
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, dreams)
+  end
+
+  get "/dreams/:id" do
+    doc = Mongo.find_one(:mongo, "dreams", %{_id: BSON.ObjectId.decode!(id)})
+
+    case doc do
+      nil ->
+        send_resp(conn, 404, "Not Found")
+
+      %{} ->
+        dream =
+          BackendStuffApi.JSONUtils.normaliseMongoId(doc)
+          |> Jason.encode!()
+
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(200, dream)
+
+      {:error, _} ->
+        send_resp(conn, 500, "Something went wrong")
+    end
+  end
+
+  put "dreams/:id" do
+    case Mongo.find_one_and_update(
+           :mongo,
+           "dreams",
+           %{_id: BSON.ObjectId.decode!(id)},
+           %{
+             "$set":
+               conn.body_params
+               |> Map.take(["name", "content"])
+               |> Enum.into(%{}, fn {key, value} -> {"#{key}", value} end)
+           },
+           return_document: :after
+         ) do
+      {:ok, doc} ->
+        case doc do
+          nil ->
+            send_resp(conn, 404, "Not Found")
+
+          _ ->
+            dream =
+              BackendStuffApi.JSONUtils.normaliseMongoId(doc)
+              |> Jason.encode!()
+
+            conn
+            |> put_resp_content_type("application/json")
+            |> send_resp(200, dream)
+        end
+
+      {:error, _} ->
+        send_resp(conn, 500, "Something went wrong")
+    end
+  end
+
+  delete "dreams/:id" do
+    Mongo.delete_one!(:mongo, "dreams", %{_id: BSON.ObjectId.decode!(id)})
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(%{id: id}))
+  end
 
   match(_, do: send_resp(conn, 404, "Not Found"))
 

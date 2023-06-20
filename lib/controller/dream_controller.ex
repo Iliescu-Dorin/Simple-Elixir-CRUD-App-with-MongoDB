@@ -1,70 +1,20 @@
-defmodule BackendStuffApi.DreamController do
-  use Plug.Router
+# defmodule BackendStuffApi.Controller.DreamController do
+#   import Plug.Conn
 
-  plug :match
-  plug :dispatch
-  plug DreamApp.AuthPlug
+#   def get_dreams(conn) do
+#     IO.inspect(conn)
+#     # user_id = get_param(conn, "user_id")
+#     dreams = get_dreams_by_user(1)
+#     render(conn, dreams)
+#   end
 
-  put "/dreams/:id" do
-    { :ok, %{ "title" => title, "category" => category, "body" => body } } = Plug.Conn.read_body(conn)
+#   defp get_dreams_by_user(user_id) do
+#     Mongo.find_one(:mongo, "dreams", %{"user_id" => user_id})
+#   end
 
-    user_id = DreamApp.Auth.decode_token(conn.private[:token])["sub"]
-    dream_id = conn.params["id"]
-
-    case DreamApp.DreamRepository.get_dream_by_id(dream_id) do
-      nil ->
-        send_resp(conn, 404, "Dream not found!")
-
-      %DreamApp.Dream{ user_id: user_id } = dream ->
-        dream_params = %{ title: title, category: category, body: body }
-
-        case DreamApp.DreamRepository.update_dream(dream, dream_params) do
-          { :ok, dream } ->
-            send_resp(conn, 200, %{ message: "Dream updated", dream: dream })
-
-          { :error, changeset } ->
-            send_resp(conn, 400, %{ errors: changeset.errors })
-        end
-
-      _ ->
-        send_resp(conn, 401, "Unauthorized action!")
-    end
-  end
-
-  post "/dreams" do
-    { :ok, %{ "title" => title, "category" => category, "body" => body } } = Plug.Conn.read_body(conn)
-
-    user_id = DreamApp.Auth.decode_token(conn.private[:token])["sub"]
-    user = DreamApp.UserRepository.get_user_by_id(user_id)
-
-    dream_params = %{ title: title, category: category, body: body, user: user }
-    case DreamApp.DreamRepository.create_dream(dream_params) do
-      { :ok, dream } ->
-        send_resp(conn, 201, %{ message: "Dream created", dream: dream })
-
-      { :error, changeset } ->
-        send_resp(conn, 400, %{ errors: changeset.errors })
-    end
-  end
-
-  delete "/dreams/:id" do
-    user_id = DreamApp.Auth.decode_token(conn.private[:token])["sub"]
-    dream_id = conn.params["id"]
-
-    case DreamApp.DreamRepository.get_dream_by_id(dream_id) do
-      nil ->
-        send_resp(conn, 404, "Dream not found!")
-
-      %DreamApp.Dream{ user_id: user_id } = dream ->
-        DreamApp.DreamRepository.delete_dream(dream)
-        send_resp(conn, 204, "Dream removed")
-
-      _ ->
-        send_resp(conn, 401, "Unauthorized action!")
-    end
-  end
-
-  defp do_match(conn, _opts) do
-    send_resp(conn, 404, "DreamController -> endpoint, Not Found!")
-  end
-end
+#   defp render(conn, dreams) do
+#     conn
+#     |> put_resp_content_type("application/json")
+#     |> send_resp(200, dreams)
+#   end
+# end
