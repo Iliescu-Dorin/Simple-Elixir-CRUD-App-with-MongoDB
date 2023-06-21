@@ -59,9 +59,9 @@ defmodule BackendStuffApi.Router do
             send_resp(conn, 401, "Invalid email or password")
 
           user ->
-            if Comeonin.Bcrypt.checkpw(password, user["password"]) do
-              token = DreamApp.Auth.encode_token(user["_id"])
-              send_resp(conn, 200, %{token: token})
+            if password == user["password"] do
+              # token = DreamApp.Auth.encode_token(user["_id"])
+              send_resp(conn, 200, "Logged in!")
             else
               send_resp(conn, 401, "Invalid email or password!")
             end
