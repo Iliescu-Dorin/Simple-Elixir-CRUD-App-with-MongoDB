@@ -1,11 +1,11 @@
-version: '3.7'
+version: "3.7"
 services:
   elixir_app:
     container_name: ElixirApp
     build:
       context: .
       dockerfile: Dockerfile
-    ports:     # Docker need to expose ports for you to access your app.
+    ports: # Docker need to expose ports for you to access your app.
       - 4000:4000
     depends_on:
       - mongodb
@@ -14,7 +14,7 @@ services:
       - mongodb
       - rabbitmq
     environment:
-        - MONGODB_URL=mongodb://root:example@localhost:27017/
+      - MONGODB_URL=mongodb://root:example@localhost:27017/
     networks:
       - node-network
 
@@ -33,7 +33,6 @@ services:
     networks:
       - node-network
     command: mongod --bind_ip_all
-
 
   rabbitmq:
     image: rabbitmq:3-management
