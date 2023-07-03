@@ -21,9 +21,12 @@ defmodule BackendStuffApi.Application do
         Mongo,
         [
           name: :mongo,
-          database: Application.get_env(:backend_stuff_api, :database),
-          pool_size: Application.get_env(:backend_stuff_api, :pool_size),
-          hostname: "mongodb"
+          url: "mongodb://mongo:27017",
+          database: "backend_stuff_api_db",
+          # username: "root",
+          # password: "example",
+          pool_size: 10,
+          timeout: 600_000
         ]
       }
       # Starts a worker by calling: BackendStuffApi.Worker.start_link(arg)
